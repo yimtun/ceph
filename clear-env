@@ -1,0 +1,21 @@
+ceph-deploy purge ceph-mon01 ceph-mon02 ceph-mon03 ceph-osd01 ceph-osd02 ceph-osd03
+ceph-deploy purgedata ceph-mon01 ceph-mon02 ceph-mon03 ceph-osd01 ceph-osd02 ceph-osd03
+ceph-deploy forgetkeys
+
+rm -rf /etc/ceph/*
+rm -rf /var/lib/ceph/*/*
+rm -rf /var/log/ceph/*
+rm -rf /var/run/ceph/*
+
+
+
+osd nodes
+
+
+lvremove  /dev/mapper/ceph--*
+y
+
+vgs  | grep ceph |  xargs vgremove
+
+pvremove  /dev/vdb
+pvremove  /dev/vdc

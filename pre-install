@@ -1,0 +1,56 @@
+ceph-mon01
+
+rm -rf /etc/yum.repos.d/*
+
+
+cat >  /etc/yum.repos.d/CentOS-Ceph-Luminous.repo  << EOF
+[centos-ceph-luminous]
+name=CentOS-$releasever - Ceph Luminous
+baseurl=http://172.16.100.21/centos-ceph-luminous/
+gpgcheck=0
+enabled=1
+EOF
+
+
+
+
+
+
+
+cat  >  /etc/yum.repos.d/CentOS-Base.repo << EOF
+[base]
+name=CentOS-$releasever - Base
+baseurl=http://172.16.100.21/base/
+gpgcheck=0
+
+[updates]
+name=CentOS-$releasever - Updates
+baseurl=http://172.16.100.21/updates/
+gpgcheck=0
+enabled=0
+
+[extras]
+name=CentOS-$releasever - Extras
+baseurl=http://172.16.100.21/extras/
+gpgcheck=0
+EOF
+
+ssh root@ceph-mon02  'rm -rf /etc/yum.repos.d/*'
+ssh root@ceph-mon03  'rm -rf /etc/yum.repos.d/*'
+ssh root@ceph-osd01  'rm -rf /etc/yum.repos.d/*'
+ssh root@ceph-osd02  'rm -rf /etc/yum.repos.d/*'
+ssh root@ceph-osd03  'rm -rf /etc/yum.repos.d/*'
+
+
+scp  /etc/yum.repos.d/*  ceph-mon02:/etc/yum.repos.d/
+scp  /etc/yum.repos.d/*  ceph-mon03:/etc/yum.repos.d/
+scp  /etc/yum.repos.d/*  ceph-osd01:/etc/yum.repos.d/
+scp  /etc/yum.repos.d/*  ceph-osd02:/etc/yum.repos.d/
+scp  /etc/yum.repos.d/*  ceph-osd03:/etc/yum.repos.d/
+
+
+
+
+
+
+

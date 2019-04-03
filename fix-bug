@@ -1,0 +1,137 @@
+ps -ef |grep 150
+
+kill -9 13871
+
+virsh  start 172.16.101.150
+
+
+console  出现  blk_update 报错 
+
+
+为 cinder  用户赋予  
+
+
+最初的授权命令 
+
+ceph auth get-or-create client.cinder mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+
+
+
+ceph auth list
+
+client.cinder
+	key: AQAtNKRc5DjBMxAAttxepILEiWHrR0zwQs7Ywg==
+	caps: [mon] allow r
+	caps: [osd] allow class-read object_prefix rbd_children, allow rwx pool=vms
+
+
+
+
+ceph auth caps client.cinder  mon 'allow r, allow command "osd blacklist"' osd  'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+updated caps for client.cinder
+
+
+client.cinder
+	key: AQAtNKRc5DjBMxAAttxepILEiWHrR0zwQs7Ywg==
+	caps: [mon] allow r, allow command "osd blacklist"
+	caps: [osd] allow class-read object_prefix rbd_children, allow rwx pool=vms
+
+
+删除 imge
+
+
+rbd  rm  vms/test.img
+2019-04-03 14:54:39.598830 7f7ad2ffd700 -1 librbd::image::RemoveRequest: 0x5595d7775f20 check_image_watchers: image has watchers - not removing
+Removing image: 0% complete...failed.
+rbd: error: image still has watchers
+This means the image is still open or the client using it crashed. Try again after closing/unmapping it or waiting 30s for the crashed client to timeout.
+
+
+
+virsh  destroy 172.16.101.150
+
+rbd  rm  vms/test.img
+Removing image: 100% complete...done.
+
+
+
+重新上传imge
+qemu-img  convert -f qcow2 -O raw /kvm/image/CentOS7.5.1804.x86_64-bak.qcow2 rbd:vms/test.img
+
+
+virsh  start  172.16.101.150
+
+
+kill -9 15767
+
+
+virsh start 172.16.101.150
+
+
+blk_update  没有再次出现
+
+
+
+
+再次测试
+
+ceph auth caps client.cinder  mon 'allow r' osd  'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+
+kill -9 15944 
+
+virsh list --all | grep 172.16.101.150
+ -     172.16.101.150                 shut off
+
+
+virsh start 172.16.101.150
+
+
+出现报错  blk_update_request: I/O error, dev vda, sector 3162672
+
+赋权
+
+ceph auth caps client.cinder  mon 'allow r, allow command "osd blacklist"' osd  'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+
+强制停机
+
+virsh destroy  172.16.101.150
+
+删除image
+rbd  rm  vms/test.img
+
+重新上传
+
+qemu-img  convert -f qcow2 -O raw /kvm/image/CentOS7.5.1804.x86_64-bak.qcow2 rbd:vms/test.img
+
+
+开机
+
+virsh start 172.16.101.150
+
+正常进入系统
+
+强制关闭虚拟机
+kill -9  17626 
+
+
+开机 
+virsh start 172.16.101.150
+
+没有 报错 可以 进入系统
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

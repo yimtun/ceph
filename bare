@@ -1,0 +1,273 @@
+on  bare  kvm  172.16.100.3
+
+cat >  /etc/yum.repos.d/CentOS-Ceph-Luminous.repo  << EOF
+[centos-ceph-luminous]
+name=CentOS-$releasever - Ceph Luminous
+baseurl=http://172.16.100.21/centos-ceph-luminous/
+gpgcheck=0
+enabled=1
+EOF
+
+
+yum -y  install ceph
+
+
+cat >>  /etc/hosts << EOF
+172.16.101.154	   ceph-mon01
+172.16.101.155	   ceph-mon02
+172.16.101.156	   ceph-mon03
+172.16.101.157	   ceph-osd01
+172.16.101.158	   ceph-osd02
+172.16.101.159	   ceph-osd03
+EOF
+
+
+scp 172.16.101.154:/etc/ceph/ceph.conf  /etc/ceph/
+scp 172.16.101.154:/etc/ceph/ceph.client.cinder.keyring  /etc/ceph/
+
+
+cat >/tmp/secret.xml  <<EOF
+<secret ephemeral='no' private='no'>
+  <uuid>9dfaf71e-156d-4a83-9bd9-3fb9e5d88ff6</uuid>
+  <usage type='ceph'>
+    <name>client.cinder secret</name>
+  </usage>
+</secret>
+EOF
+
+
+virsh secret-define --file /tmp/secret.xml
+
+virsh secret-set-value --secret 9dfaf71e-156d-4a83-9bd9-3fb9e5d88ff6  --base64 $(cat /etc/ceph/ceph.client.cinder.keyring)
+
+
+
+username 
+cinder
+
+uuid
+9dfaf71e-156d-4a83-9bd9-3fb9e5d88ff6
+
+
+cp /etc/libvirt/qemu/test-ceph.xml    /opt/
+
+virsh  undefine test-ceph
+
+
+vim /opt/test-ceph.xml
+
+
+
+<disk type='network' device='disk'>
+      <driver name='qemu' type='raw' cache='writeback'/>
+      <auth username='cinder'>
+        <secret type='ceph' uuid='9dfaf71e-156d-4a83-9bd9-3fb9e5d88ff6'/>
+      </auth>
+      <source protocol='rbd' name='vms/test1.img'>
+        <host name='172.16.101.154' port='6789'/>
+        <host name='172.16.101.155' port='6789'/>
+        <host name='172.16.101.156' port='6789'/>
+      </source>
+      <target dev='vda' bus='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
+</disk>
+
+
+
+###  172.16.101.154 
+
+upload image 
+
+qemu-img  convert -f qcow2 -O raw /CentOS7.5.1804.x86_64-bak.qcow2 rbd:vms/test1.img
+
+
+复原 权限 
+
+ceph auth caps client.cinder  mon 'allow r' osd  'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+
+
+
+### bare host 
+
+virsh define /opt/test-ceph.xml
+
+virsh start   test-ceph
+
+virt-manager 如下图
+
+
+
+
+###  diff ceph config 
+
+### 172.16.101.154 
+ceph auth list
+
+client.cinder
+	key: AQAtNKRc5DjBMxAAttxepILEiWHrR0zwQs7Ywg==
+	caps: [mon] allow r
+	caps: [osd] allow class-read object_prefix rbd_children, allow rwx pool=vms
+
+
+```
+[global]
+fsid = dc04960e-c1ef-4a8b-b2b8-8ba697cc0f0d
+mon_initial_members = ceph-mon01, ceph-mon02, ceph-mon03
+mon_host = 172.16.101.154,172.16.101.155,172.16.101.156
+auth_cluster_required = cephx
+auth_service_required = cephx
+auth_client_required = cephx
+
+[osd]
+osd max write size = 512
+osd client message size cap = 2147483648
+osd deep scrub stride = 131072
+osd op threads = 20
+osd disk threads = 4
+osd map cache size = 1024
+osd map cache bl size = 128
+osd recovery op priority = 4
+osd recovery max active = 10
+osd max backfills = 4
+
+[client]
+rbd cache = true
+rbd cache size = 268435456
+rbd cache max dirty = 134217728
+```
+
+
+
+### openstack ceph 
+
+ceph auth list
+
+client.cinder
+	key: AQDvMTtcQOVoGBAAEpRaeCJ1X0xJyz59mN/MCg==
+	caps: [mon] allow r
+	caps: [osd] allow class-read object_prefix rbd_children, allow rwx pool=volumes, allow rwx pool=vms, allow rx pool=images
+
+```
+[global]
+fsid = dd772cbc-e7ab-4110-84d4-5c2a56e63982
+mon_initial_members = ceph-mon01, ceph-mon02, ceph-mon03
+mon_host = 10.255.10.11,10.255.10.12,10.255.10.13
+auth_cluster_required = cephx
+auth_service_required = cephx
+auth_client_required = cephx
+
+public network = 10.255.10.0/24
+cluster network = 10.255.8.0/24
+osd pool default size = 3
+osd pool default min size = 1
+max open files = 131072
+
+[osd]
+osd max write size = 512
+osd client message size cap = 2147483648
+osd deep scrub stride = 131072
+osd op threads = 20
+osd disk threads = 4
+osd map cache size = 1024
+osd map cache bl size = 128
+osd recovery op priority = 4
+osd recovery max active = 10
+osd max backfills = 4
+
+[client]
+rbd cache = true
+rbd cache size = 268435456
+rbd cache max dirty = 134217728
+```
+
+
+
+
+
+bars host  ilo  Cold Boot
+
+
+
+virsh start   test-ceph
+
+效果如下图
+
+
+
+
+##  on bare host 
+强制停虚拟机
+virsh destroy   test-ceph
+
+
+## on  ceph-mon
+删除image
+rbd  rm  vms/test1.img
+
+重新上传 image
+
+qemu-img  convert -f qcow2 -O raw /CentOS7.5.1804.x86_64-bak.qcow2 rbd:vms/test1.img 
+
+赋权cinder  osd blacklist 权限
+
+ceph auth caps client.cinder  mon 'allow r, allow command "osd blacklist"' osd  'allow class-read object_prefix rbd_children, allow rwx pool=vms'
+
+
+
+### on bare host
+
+virsh start test-ceph
+
+正常开机 如下图
+
+ilo  Cold Boot
+
+
+virsh start    test-ceph
+
+virt-manager 如下图
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

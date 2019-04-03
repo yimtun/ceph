@@ -1,0 +1,57 @@
+yum -y  install ceph
+
+
+
+cat >>  /etc/hosts << EOF
+172.16.101.154	ceph-mon01
+172.16.101.155	ceph-mon02
+172.16.101.156	ceph-mon03
+172.16.101.157	ceph-osd01
+172.16.101.158	ceph-osd02
+172.16.101.159	ceph-osd03
+EOF
+
+
+scp ceph-mon01:/etc/ceph/ceph.client.cinder.keyring   /etc/ceph/
+scp ceph-mon01:/etc/ceph/ceph.client.admin.keyring   /etc/ceph/
+
+scp ceph-mon01:/etc/ceph/ceph.conf    /etc/ceph/
+
+qemu-img  convert -f qcow2 -O raw /kvm/image/CentOS7.5.1804.x86_64-bak.qcow2 rbd:vms/test.img
+
+
+
+<disk type='network' device='disk'>
+      <driver name='qemu' type='raw' cache='writeback' discard='unmap'/>
+      <auth username='cinder'>
+        <secret type='ceph' uuid='9dfaf71e-156d-4a83-9bd9-3fb9e5d88ff6'/>
+      </auth>
+      <source protocol='rbd' name='vms/test.img'>
+        <host name='172.16.101.154' port='6789'/>
+        <host name='172.16.101.155' port='6789'/>
+        <host name='172.16.101.156' port='6789'/>
+      </source>
+      <target dev='vda' bus='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+</disk>
+
+
+address type='pci'   保证和更改之前一样  不要冲突
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
